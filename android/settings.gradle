@@ -1,0 +1,3 @@
+rootProject.name = 'FD_ARM'
+
+include ':app'
