@@ -11,13 +11,9 @@ import React, {Component} from 'react';
 import {Platform, StyleSheet, Text, View, Button} from 'react-native';
 import SegmentedControlTab from 'react-native-segmented-control-tab';
 import ToggleSwitch from 'toggle-switch-react-native'
-
-const instructions = Platform.select({
-  ios: 'Press Cmd+R to reload,\n' + 'Cmd+D or shake for dev menu',
-  android:
-    'Double tap R on your keyboard to reload,\n' +
-    'Shake or press menu button for dev menu',
-});
+import {
+  Player
+} from 'react-native-audio-toolkit';
 
 export default class App extends Component {
   constructor() {
@@ -36,7 +32,7 @@ export default class App extends Component {
   }
 
   onStartReporting() {
-    console.log("start reporting")
+    new Player("voice_100ft.wav").play();
   }
 
   render() {
