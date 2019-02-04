@@ -11,10 +11,12 @@ import React, {Component} from 'react';
 import {StyleSheet, Text, View, Button} from 'react-native';
 import SegmentedControlTab from 'react-native-segmented-control-tab';
 import ToggleSwitch from 'toggle-switch-react-native'
-import {
-  Player
-} from 'react-native-audio-toolkit';
+// import {
+//   Player
+// } from 'react-native-audio-toolkit';
 import {voice} from './audio_files';
+import Sockets from 'react-native-sockets';
+import { DeviceEventEmitter } from 'react-native';
 
 export default class App extends Component {
   audioPlayers = new Object()
@@ -25,21 +27,55 @@ export default class App extends Component {
       selectedIndex: 0,
       reporting: false,
       automaticReporting: false,
-      altitude: 120
-    };
+      altitude: 120,
+      connected: false
+    }
+
+    DeviceEventEmitter.addListener('socketClient_connected', () => {
+      console.log('socketClient_connected');
+      this.handleConnectionStatusChange(true);
+    });
+
+    DeviceEventEmitter.addListener('socketClient_closed', (data) => {
+      console.log('socketClient_closed',data.error);
+      this.handleConnectionStatusChange(false);
+    });
+
+    DeviceEventEmitter.addListener('socketClient_data', (payload) => {
+      //console.log('socketClient_data message:', payload.data);
+      let [event, data] = payload.data.split(':');
+      this.setState({altitude: data});
+    });
+
+    DeviceEventEmitter.addListener('socketClient_error', (data) => {
+      console.log('socketClient_error',data.error);
+    });
+
+    let config = {
+      address: "192.168.4.1", //ip address of server
+      port: 4000,
+      // reconnect:true,
+      // reconnectDelay:1000,
+      // maxReconnectAttempts:10,
+    }
+    
+    Sockets.startClient(config);
 
     // Loop through audio voice files and prepare them
-    console.log("setting up")
-    for (let file in voice) {
-      let fileName = voice[file]
-      this.audioPlayers[voice[file]] = new Player(fileName, {
-        autoDestroy: false
-      }).prepare((err) => {
-        if (err) {
-          console.log("Audio file prepare eror:", err)
-        }
-      })
-    }
+    // for (let file in voice) {
+    //   let fileName = voice[file]
+    //   this.audioPlayers[voice[file]] = new Player(fileName, {
+    //     autoDestroy: false
+    //   }).prepare((err) => {
+    //     if (err) {
+    //       console.log("Audio file prepare eror:", err)
+    //     }
+    //   })
+    // }
+  }
+
+  handleConnectionStatusChange = (status) => {
+    this.setState({connected: status});
   }
 
   handleIndexChange = (index) => {
@@ -53,15 +89,15 @@ export default class App extends Component {
     this.state.altitude = 120;
     let interval = setInterval(()=> {
       // Voice
-      if (this.state.selectedIndex == 0) {
-        if ((this.state.altitude % 10) == 0 && ((this.state.altitude <=50 && this.state.altitude > 0) || this.state.altitude == 100)) {
-          this.audioPlayers["voice_" + this.state.altitude + "ft.mp3"].play()
-        }
+      // if (this.state.selectedIndex == 0) {
+      //   if ((this.state.altitude % 10) == 0 && ((this.state.altitude <=50 && this.state.altitude > 0) || this.state.altitude == 100)) {
+      //     this.audioPlayers["voice_" + this.state.altitude + "ft.mp3"].play()
+      //   }
 
-      // Beeps
-      } else if (this.state.selectedIndex == 2) {
+      // // Beeps
+      // } else if (this.state.selectedIndex == 2) {
 
-      }
+      // }
       
       if (this.state.altitude > 0) {
         this.setState({altitude: this.state.altitude - 1});
@@ -75,7 +111,7 @@ export default class App extends Component {
     return (
       <View style={styles.container}>
         <Text style={styles.altitude}>Altitude: {this.state.altitude}ft</Text>
-        <Text style={styles.welcome}>Status: <Text style={{color: 'green'}}>Connected</Text></Text>
+        <Text style={styles.welcome}>Status: <Text style={{color: this.state.connected ? 'green' : 'red'}}>{this.state.connected ? "Connected" : "Disconnected"}</Text></Text>
         <Text style={styles.welcome}>Reporting Mode</Text>
         <SegmentedControlTab
           tabsContainerStyle={{marginLeft: 150, marginRight: 150}}
