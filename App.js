@@ -1,7 +1,7 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
+ * Flare Director
+ * App.js
+ * Entry Point for mobile Application
  * @format
  * @flow
  * @lint-ignore-every XPLATJSCOPYRIGHT1
@@ -11,9 +11,7 @@ import React, {Component} from 'react';
 import {StyleSheet, Text, View, Button} from 'react-native';
 import SegmentedControlTab from 'react-native-segmented-control-tab';
 import ToggleSwitch from 'toggle-switch-react-native'
-// import {
-//   Player
-// } from 'react-native-audio-toolkit';
+// import { Player } from 'react-native-audio-toolkit';
 import {voice} from './audio_files';
 import Sockets from 'react-native-sockets';
 import { DeviceEventEmitter } from 'react-native';
@@ -23,40 +21,50 @@ export default class App extends Component {
 
   constructor() {
     super();
+
+    // Initialize state
     this.state = {
       selectedIndex: 0,
       reporting: false,
       automaticReporting: false,
-      altitude: 120,
+      altitude: 0,
       connected: false
     }
 
+    // Handle "connected" status change
     DeviceEventEmitter.addListener('socketClient_connected', () => {
       console.log('socketClient_connected');
       this.handleConnectionStatusChange(true);
     });
 
+    // Handle "disconnected" status change
     DeviceEventEmitter.addListener('socketClient_closed', (data) => {
       console.log('socketClient_closed',data.error);
       this.handleConnectionStatusChange(false);
-    });
+    }); 
 
+    // Handle when the socket receives a new packet
     DeviceEventEmitter.addListener('socketClient_data', (payload) => {
-      //console.log('socketClient_data message:', payload.data);
+      console.log('socketClient_data message:', payload.data);
+
+      // Parse data and event from received packet
       let [event, data] = payload.data.split(':');
-      this.setState({altitude: data});
+
+      // Decide what to do with event and data
+      this.handleEvent(event, data);
     });
 
+    // Handle when the socket receives an error
     DeviceEventEmitter.addListener('socketClient_error', (data) => {
       console.log('socketClient_error',data.error);
     });
 
+    // Socket connection configuration
     let config = {
-      address: "192.168.4.1", //ip address of server
+      address: "192.168.4.1",
       port: 4000,
       // reconnect:true,
-      // reconnectDelay:1000,
-      // maxReconnectAttempts:10,
+      // reconnectDelay:5000,
     }
     
     Sockets.startClient(config);
@@ -74,10 +82,21 @@ export default class App extends Component {
     // }
   }
 
+  // Decides what to do based on a received event and data
+  handleEvent = (event, data) => {
+    switch (event) {
+      case "altitude":
+        this.setState({altitude: data});
+      break;
+    }
+  }
+
+  // Updates state based on connection status
   handleConnectionStatusChange = (status) => {
     this.setState({connected: status});
   }
 
+  // Handles the segmented button index change event
   handleIndexChange = (index) => {
     this.setState({
       ...this.state,
@@ -85,32 +104,21 @@ export default class App extends Component {
     });
   }
 
+  // TODO
   onStartReporting = () => {
-    this.state.altitude = 120;
-    let interval = setInterval(()=> {
-      // Voice
-      // if (this.state.selectedIndex == 0) {
-      //   if ((this.state.altitude % 10) == 0 && ((this.state.altitude <=50 && this.state.altitude > 0) || this.state.altitude == 100)) {
-      //     this.audioPlayers["voice_" + this.state.altitude + "ft.mp3"].play()
-      //   }
-
-      // // Beeps
-      // } else if (this.state.selectedIndex == 2) {
-
-      // }
-      
-      if (this.state.altitude > 0) {
-        this.setState({altitude: this.state.altitude - 1});
-      } else {
-        clearInterval(interval);
-      } 
-    }, 100);
+    
   }
 
+  // Sends the "calibrate" event to the Sensor Module
+  onCalibrate = () => {
+    Sockets.write("calibrate:1");
+  }
+
+  // The UI rendered on screen
   render() {
     return (
       <View style={styles.container}>
-        <Text style={styles.altitude}>Altitude: {this.state.altitude}ft</Text>
+        <Text style={styles.altitude}>Altitude: {this.state.altitude}cm</Text>
         <Text style={styles.welcome}>Status: <Text style={{color: this.state.connected ? 'green' : 'red'}}>{this.state.connected ? "Connected" : "Disconnected"}</Text></Text>
         <Text style={styles.welcome}>Reporting Mode</Text>
         <SegmentedControlTab
@@ -154,6 +162,7 @@ export default class App extends Component {
   }
 }
 
+// UI Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
