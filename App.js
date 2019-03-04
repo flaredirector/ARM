@@ -28,7 +28,9 @@ export default class App extends Component {
       reporting: false,
       automaticReporting: false,
       altitude: 0,
-      connected: false
+      lidarData: 0,
+      sonarData: 0,
+      connected: false,
     }
 
     // Handle "connected" status change
@@ -41,22 +43,27 @@ export default class App extends Component {
     DeviceEventEmitter.addListener('socketClient_closed', (data) => {
       console.log('socketClient_closed',data.error);
       this.handleConnectionStatusChange(false);
+      Sockets.disconnect();
     }); 
 
     // Handle when the socket receives a new packet
     DeviceEventEmitter.addListener('socketClient_data', (payload) => {
-      console.log('socketClient_data message:', payload.data);
+      let events = payload.data.split("|");
 
-      // Parse data and event from received packet
-      let [event, data] = payload.data.split(':');
+      for (event in events) {
 
-      // Decide what to do with event and data
-      this.handleEvent(event, data);
+        // Parse data and event from received packet
+        let [eventString, data] = events[event].split(':');
+
+        // Decide what to do with event and data
+        this.handleEvent(eventString, data);
+      }
     });
 
     // Handle when the socket receives an error
     DeviceEventEmitter.addListener('socketClient_error', (data) => {
-      console.log('socketClient_error',data.error);
+      console.log('socketClient_error', data);
+      Sockets.disconnect();
     });
 
     // Socket connection configuration
@@ -68,6 +75,13 @@ export default class App extends Component {
     }
     
     Sockets.startClient(config);
+
+    // Sockets.isServerAvailable(config.address, config.port, 2000, success => {
+    //   console.log("SERVER AVAILABLE");
+    // }, err => {
+    //   console.log("SERVER NOT AVAILABLE");
+    //   Sockets.disconnect();
+    // });
 
     // Loop through audio voice files and prepare them
     // for (let file in voice) {
@@ -87,6 +101,10 @@ export default class App extends Component {
     switch (event) {
       case "altitude":
         this.setState({altitude: data});
+      case "lidarData":
+        this.setState({lidarData: data});
+      case "sonarData":
+        this.setState({sonarData: data});
       break;
     }
   }
@@ -105,8 +123,11 @@ export default class App extends Component {
   }
 
   // TODO
-  onStartReporting = () => {
-    
+  onStartReporting = (isOn) => {
+    setTimeout(function() {
+      Sockets.write(`reportingToggle:${isOn ? "1" : "0"}`);
+    }.bind(this), 3500);
+    this.setState({reporting: isOn});
   }
 
   // Sends the "calibrate" event to the Sensor Module
@@ -119,6 +140,8 @@ export default class App extends Component {
     return (
       <View style={styles.container}>
         <Text style={styles.altitude}>Altitude: {this.state.altitude}cm</Text>
+        <Text style={styles.welcome}>LIDAR: {this.state.lidarData}cm</Text>
+        <Text style={styles.welcome}>SONAR: {this.state.sonarData}cm</Text>
         <Text style={styles.welcome}>Status: <Text style={{color: this.state.connected ? 'green' : 'red'}}>{this.state.connected ? "Connected" : "Disconnected"}</Text></Text>
         <Text style={styles.welcome}>Reporting Mode</Text>
         <SegmentedControlTab
@@ -127,28 +150,14 @@ export default class App extends Component {
           selectedIndex={this.state.selectedIndex}
           onTabPress={this.handleIndexChange}
         />
-        <Text style={styles.welcome}>Reporting On/Off</Text>
+        <View style={{marginBottom: 50}}/>
+        <Text style={styles.welcome}>Reporting Off/On</Text>
         <ToggleSwitch
           isOn={this.state.reporting}
           onColor='green'
           offColor='red'
           size='large'
-          onToggle={ (isOn) => this.setState({...this.state, reporting: isOn})}
-        />
-        <Text style={styles.welcome}>Automatic Reporting On/Off</Text>
-        <ToggleSwitch
-          isOn={this.state.automaticReporting}
-          onColor='green'
-          offColor='red'
-          size='large'
-          onToggle={ (isOn) => this.setState({...this.state, automaticReporting: isOn})}
-        />
-        <View style={{marginBottom: 50}}/>
-        <Button
-          onPress={this.onStartReporting}
-          title="Start Reporting (Demonstration)"
-          color="green"
-          accessibilityLabel="Start Reporting Altitude"
+          onToggle={this.onStartReporting}
         />
         <View style={{marginBottom: 50}}/>
         <Button
@@ -173,16 +182,11 @@ const styles = StyleSheet.create({
   welcome: {
     fontSize: 20,
     textAlign: 'center',
-    margin: 10,
+    margin: 20,
   },
   altitude: {
     fontSize: 40,
     textAlign: 'center',
     margin: 10,
-  },
-  instructions: {
-    textAlign: 'center',
-    color: '#333333',
-    marginBottom: 5,
   },
 });
