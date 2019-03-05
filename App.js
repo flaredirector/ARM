@@ -13,11 +13,18 @@ import SegmentedControlTab from 'react-native-segmented-control-tab';
 import ToggleSwitch from 'toggle-switch-react-native'
 // import { Player } from 'react-native-audio-toolkit';
 import {voice} from './audio_files';
-import Sockets from 'react-native-sockets';
-import { DeviceEventEmitter } from 'react-native';
+import * as net from'react-native-tcp';
 
 export default class App extends Component {
   audioPlayers = new Object()
+  client = null
+  reconnectInterval = null
+
+  // Socket connection configuration
+  socketConfig = {
+    host: "192.168.4.1",
+    port: 4000
+  }
 
   constructor() {
     super();
@@ -33,55 +40,19 @@ export default class App extends Component {
       connected: false,
     }
 
-    // Handle "connected" status change
-    DeviceEventEmitter.addListener('socketClient_connected', () => {
-      console.log('socketClient_connected');
+    // Create new socket conneciton with provided configuration
+    this.client = net.createConnection(this.socketConfig, ()=> {
+      console.log("Client connected");
+      this.setupClientEventHandlers();
       this.handleConnectionStatusChange(true);
     });
 
-    // Handle "disconnected" status change
-    DeviceEventEmitter.addListener('socketClient_closed', (data) => {
-      console.log('socketClient_closed',data.error);
-      this.handleConnectionStatusChange(false);
-      Sockets.disconnect();
-    }); 
-
-    // Handle when the socket receives a new packet
-    DeviceEventEmitter.addListener('socketClient_data', (payload) => {
-      let events = payload.data.split("|");
-
-      for (event in events) {
-
-        // Parse data and event from received packet
-        let [eventString, data] = events[event].split(':');
-
-        // Decide what to do with event and data
-        this.handleEvent(eventString, data);
+    this.client.on('error', (error) => {
+      if (error.message.includes("Connection refused")) {
+        console.log("Connection refused");
+        this.reconnectInterval = this.startReconnectInterval();
       }
     });
-
-    // Handle when the socket receives an error
-    DeviceEventEmitter.addListener('socketClient_error', (data) => {
-      console.log('socketClient_error', data);
-      Sockets.disconnect();
-    });
-
-    // Socket connection configuration
-    let config = {
-      address: "192.168.4.1",
-      port: 4000,
-      // reconnect:true,
-      // reconnectDelay:5000,
-    }
-    
-    Sockets.startClient(config);
-
-    // Sockets.isServerAvailable(config.address, config.port, 2000, success => {
-    //   console.log("SERVER AVAILABLE");
-    // }, err => {
-    //   console.log("SERVER NOT AVAILABLE");
-    //   Sockets.disconnect();
-    // });
 
     // Loop through audio voice files and prepare them
     // for (let file in voice) {
@@ -96,16 +67,83 @@ export default class App extends Component {
     // }
   }
 
+  setupClientEventHandlers = () => {
+    // Handle socket error
+    this.client.on('error', function(error) {
+      console.log(error);
+    });
+
+    this.client.on('data', (data) => {
+      // Convert from ASCII UINT8 array to string
+      let payloadData = String.fromCharCode.apply(null, data);
+
+      // Trim last character '\4' from payload data string
+      payloadData = payloadData.slice(0, -1);
+
+      // Get each event in payload
+      let events = payloadData.split("|");
+
+      // Create empty dictionary
+      let dict = {};
+
+      // Parse each event and handle it
+      for (event in events) {
+        // Parse data and event from received packet
+        let [eventString, data] = events[event].split(':');
+
+        // Decide what to do with event and data
+        // this.handleEvent(eventString, data);
+
+        // Fill dictionary with received sensor data
+        dict[eventString] = data;
+      }
+
+      // Update the UI
+      this.setState(dict);
+    });
+
+    // Handle socket close event
+    this.client.on('close', () => {
+      console.log("Client closed connection");
+      this.handleConnectionStatusChange(false);
+      this.reconnectInterval = this.startReconnectInterval();
+    });
+  }
+
+  // Starts the reconnect interval for the TCP socket; attempts
+  // reconnect every 5 seconds
+  startReconnectInterval = () => {
+    // Return interval object
+    return setInterval(()=> {
+      console.log("Trying to reconnect...");
+      // Make sure existing client is nullified
+      this.client = null;
+
+      // Attempt to create new client
+      this.client = net.createConnection(this.socketConfig, ()=> {
+        console.log("Client reconnected!");
+        // Setup event handlers and change connection state
+        this.setupClientEventHandlers();
+        this.handleConnectionStatusChange(true);
+
+        // Clear and nullify the interval
+        clearInterval(this.reconnectInterval);
+        this.reconnectInterval = null
+      });
+
+      // Set error handler; needed to prevent crash
+      this.client.on('error', (error) => {
+        if (error.message.includes("Connection refused")) {
+          console.log("Reconnection failed");
+        }
+      });
+    }, 5000);
+  }
+
   // Decides what to do based on a received event and data
   handleEvent = (event, data) => {
     switch (event) {
-      case "altitude":
-        this.setState({altitude: data});
-      case "lidarData":
-        this.setState({lidarData: data});
-      case "sonarData":
-        this.setState({sonarData: data});
-      break;
+      
     }
   }
 
@@ -124,15 +162,13 @@ export default class App extends Component {
 
   // TODO
   onStartReporting = (isOn) => {
-    setTimeout(function() {
-      Sockets.write(`reportingToggle:${isOn ? "1" : "0"}`);
-    }.bind(this), 3500);
     this.setState({reporting: isOn});
+    this.client.write(`reportingToggle:${isOn ? "1" : "0"}`);
   }
 
   // Sends the "calibrate" event to the Sensor Module
   onCalibrate = () => {
-    Sockets.write("calibrate:1");
+    this.client.write("calibrate:1");
   }
 
   // The UI rendered on screen

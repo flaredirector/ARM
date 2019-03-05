@@ -8,11 +8,15 @@
     "android": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res && react-native run-android"
   },
   "dependencies": {
+    "process": "^0.11.0",
     "react": "16.6.3",
-    "react-native": "0.58.3",
+    "react-native": "^0.58.6",
     "react-native-audio-toolkit": "^1.0.6",
     "react-native-segmented-control-tab": "^3.4.0",
     "react-native-sockets": "0.0.4",
+    "react-native-tcp": "^3.3.0",
+    "readable-stream": "^1.0.33",
+    "stream-browserify": "^1.0.0",
     "toggle-switch-react-native": "^2.0.2"
   },
   "devDependencies": {
@@ -20,9 +24,26 @@
     "babel-jest": "24.0.0",
     "jest": "24.0.0",
     "metro-react-native-babel-preset": "0.51.1",
-    "react-test-renderer": "16.6.3"
+    "react-test-renderer": "16.6.3",
+    "rn-nodeify": "^10.0.1"
   },
   "jest": {
     "preset": "react-native"
+  },
+  "react-native": {
+    "_stream_transform": "readable-stream/transform",
+    "_stream_readable": "readable-stream/readable",
+    "_stream_writable": "readable-stream/writable",
+    "_stream_duplex": "readable-stream/duplex",
+    "_stream_passthrough": "readable-stream/passthrough",
+    "stream": "stream-browserify"
+  },
+  "browser": {
+    "_stream_transform": "readable-stream/transform",
+    "_stream_readable": "readable-stream/readable",
+    "_stream_writable": "readable-stream/writable",
+    "_stream_duplex": "readable-stream/duplex",
+    "_stream_passthrough": "readable-stream/passthrough",
+    "stream": "stream-browserify"
   }
 }
