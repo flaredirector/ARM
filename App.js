@@ -11,9 +11,11 @@ import React, {Component} from 'react';
 import {StyleSheet, Text, View, Button} from 'react-native';
 import SegmentedControlTab from 'react-native-segmented-control-tab';
 import ToggleSwitch from 'toggle-switch-react-native'
-// import { Player } from 'react-native-audio-toolkit';
-import {voice} from './audio_files';
 import * as net from'react-native-tcp';
+
+import {NativeModules} from 'react-native';
+
+let ToneGenerator = NativeModules.ToneGenerator;
 
 export default class App extends Component {
   audioPlayers = new Object()
@@ -33,38 +35,27 @@ export default class App extends Component {
     this.state = {
       selectedIndex: 0,
       reporting: false,
-      automaticReporting: false,
       altitude: 0,
       lidarData: 0,
       sonarData: 0,
       connected: false,
+      isTonePlaying: false
     }
 
     // Create new socket conneciton with provided configuration
-    this.client = net.createConnection(this.socketConfig, ()=> {
-      console.log("Client connected");
-      this.setupClientEventHandlers();
-      this.handleConnectionStatusChange(true);
-    });
+    // this.client = net.createConnection(this.socketConfig, ()=> {
+    //   console.log("Client connected");
+    //   // Setup event handlers and change connection status
+    //   this.setupClientEventHandlers();
+    //   this.handleConnectionStatusChange(true);
+    // });
 
-    this.client.on('error', (error) => {
-      if (error.message.includes("Connection refused")) {
-        console.log("Connection refused");
-        this.reconnectInterval = this.startReconnectInterval();
-      }
-    });
-
-    // Loop through audio voice files and prepare them
-    // for (let file in voice) {
-    //   let fileName = voice[file]
-    //   this.audioPlayers[voice[file]] = new Player(fileName, {
-    //     autoDestroy: false
-    //   }).prepare((err) => {
-    //     if (err) {
-    //       console.log("Audio file prepare eror:", err)
-    //     }
-    //   })
-    // }
+    // this.client.on('error', (error) => {
+    //   if (error.message.includes("Connection refused")) {
+    //     console.log("Connection refused");
+    //     this.reconnectInterval = this.startReconnectInterval();
+    //   }
+    // });
   }
 
   setupClientEventHandlers = () => {
@@ -90,9 +81,6 @@ export default class App extends Component {
       for (event in events) {
         // Parse data and event from received packet
         let [eventString, data] = events[event].split(':');
-
-        // Decide what to do with event and data
-        // this.handleEvent(eventString, data);
 
         // Fill dictionary with received sensor data
         dict[eventString] = data;
@@ -140,13 +128,6 @@ export default class App extends Component {
     }, 5000);
   }
 
-  // Decides what to do based on a received event and data
-  handleEvent = (event, data) => {
-    switch (event) {
-      
-    }
-  }
-
   // Updates state based on connection status
   handleConnectionStatusChange = (status) => {
     this.setState({connected: status});
@@ -169,6 +150,11 @@ export default class App extends Component {
   // Sends the "calibrate" event to the Sensor Module
   onCalibrate = () => {
     this.client.write("calibrate:1");
+  }
+
+  onTone = () => {
+    let tg = new ToneGenerator();
+    ToneGenerator.playSound(1000, 100);
   }
 
   // The UI rendered on screen
@@ -201,6 +187,13 @@ export default class App extends Component {
           title="Calibrate Sensor Module"
           color="gray"
           accessibilityLabel="Calibrate Sensor Module"
+        />
+        <View style={{marginBottom: 50}}/>
+        <Button
+          onPress={this.onTone}
+          title="Test tone generator"
+          color="gray"
+          accessibilityLabel="tone"
         />
       </View>
     );
