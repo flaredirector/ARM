@@ -12,20 +12,31 @@ import {StyleSheet, Text, View, Button} from 'react-native';
 import SegmentedControlTab from 'react-native-segmented-control-tab';
 import ToggleSwitch from 'toggle-switch-react-native'
 import * as net from'react-native-tcp';
-
 import {NativeModules} from 'react-native';
+import {voiceFiles} from './audio_files';
+import Sound from 'react-native-sound';
+Sound.setCategory('Playback');
 
+// Import custom tone generator module
 let ToneGenerator = NativeModules.ToneGenerator;
 
 export default class App extends Component {
-  audioPlayers = new Object()
+  // Class properties
+  voiceFileAudioPlayers = new Object()
   client = null
   reconnectInterval = null
-
-  // Socket connection configuration
+  simulationInterval = null
   socketConfig = {
     host: "192.168.4.1",
     port: 4000
+  }
+  voiceAnnunciationsReported = {
+    annunciation100: false,
+    annunciation50: false,
+    annunciation40: false,
+    annunciation30: false, 
+    annunciation20: false,
+    annunciation10: false,
   }
 
   constructor() {
@@ -43,21 +54,36 @@ export default class App extends Component {
     }
 
     // Create new socket conneciton with provided configuration
-    // this.client = net.createConnection(this.socketConfig, ()=> {
-    //   console.log("Client connected");
-    //   // Setup event handlers and change connection status
-    //   this.setupClientEventHandlers();
-    //   this.handleConnectionStatusChange(true);
-    // });
+    this.client = net.createConnection(this.socketConfig, ()=> {
+      console.log("Client connected");
+      // Setup event handlers and change connection status
+      this.setupClientEventHandlers();
+      this.handleConnectionStatusChange(true);
+    });
 
-    // this.client.on('error', (error) => {
-    //   if (error.message.includes("Connection refused")) {
-    //     console.log("Connection refused");
-    //     this.reconnectInterval = this.startReconnectInterval();
-    //   }
-    // });
+    this.client.on('error', (error) => {
+      if (error.message.includes("Connection refused")) {
+        console.log("Connection refused");
+        this.reconnectInterval = this.startReconnectInterval();
+      }
+    });
+   
+    this.preloadVoiceFiles();
   }
 
+  // Preloads the voice files to reduce latency when playing
+  preloadVoiceFiles = () => {
+    voiceFiles.forEach((filename) => {
+      this.voiceFileAudioPlayers[filename] = new Sound(filename, Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+          console.log('Failed to preload sound file', {error,filename});
+          return;
+        }
+      });
+    });
+  }
+
+  // Sets up the socket event handlers for receiving errors and data
   setupClientEventHandlers = () => {
     // Handle socket error
     this.client.on('error', function(error) {
@@ -84,6 +110,8 @@ export default class App extends Component {
 
         // Fill dictionary with received sensor data
         dict[eventString] = data;
+
+        this.handleEvent(eventString, data);
       }
 
       // Update the UI
@@ -152,9 +180,73 @@ export default class App extends Component {
     this.client.write("calibrate:1");
   }
 
+  // Handles incoming event from the ASM
+  handleEvent = (event, data) => {
+    if (event === "altitude") {
+      // Voice annunciations selected
+      if (this.state.selectedIndex == 0) {
+        ToneGenerator.setIsPlaying(false);
+        let alt = null;
+        if (data < 105 && data > 95)
+          alt = 100; 
+        else if (data < 55 && data > 45)
+          alt = 50;
+        else if (data < 45 && data > 35)
+          alt = 40;
+        else if (data < 35 && data > 25)
+          alt = 30;
+        else if (data < 25 && data > 15)
+          alt = 20;
+        else if (data < 15 && data > 5)
+          alt = 10;
+        if (alt) {
+          if (!this.voiceAnnunciationsReported[`annunciation${alt}`]) {
+            this.voiceFileAudioPlayers[`voice_${alt}ft.mp3`].play((success) => {
+              if (success) {
+                console.log('Done playing voice file')
+              } else {
+                console.log('Voice file playback failed');
+              }
+            });
+            this.voiceAnnunciationsReported[`annunciation${alt}`] = true;
+          }
+        }
+      // Beeps annunciation selected
+      } else if (this.state.selectedIndex == 2) {
+        ToneGenerator.setIsPlaying(true);
+        ToneGenerator.setDelay(Math.round(data*4.16)+50);
+      }
+    }
+  }
+
   onTone = () => {
-    let tg = new ToneGenerator();
-    ToneGenerator.playSound(1000, 100);
+    let delay = 500;
+    ToneGenerator.setShouldQuit(false);
+    ToneGenerator.playSound(500, 80);
+    setInterval(() => {
+      delay -= 25;
+      ToneGenerator.setDelay((delay < 50) ? 50 : delay);
+    }, 500);
+  }
+
+  startLandingSimulation = () => {
+    if (this.simulationInterval) {
+      clearInterval(this.simulationInterval);
+      this.simulationInterval = null;
+    } else {
+      ToneGenerator.setShouldQuit(false);
+      ToneGenerator.playSound(500, 80);
+      this.simulationInterval = setInterval(() => {
+        this.setState({altitude: this.state.altitude-1});
+        if (this.state.altitude < 0) {
+          this.setState({altitude: 120});
+          Object.keys(this.voiceAnnunciationsReported).forEach((key) => {
+            this.voiceAnnunciationsReported[key] = false;
+          });
+        }
+        this.handleEvent("altitude", this.state.altitude);
+      }, 100);
+    }  
   }
 
   // The UI rendered on screen
@@ -195,7 +287,14 @@ export default class App extends Component {
           color="gray"
           accessibilityLabel="tone"
         />
-      </View>
+        <View style={{marginBottom: 50}}/>
+        <Button
+          onPress={this.startLandingSimulation}
+          title="Simulate landing"
+          color="gray"
+          accessibilityLabel="simulation"
+        />
+    </View>
     );
   }
 }
