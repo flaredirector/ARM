@@ -61,6 +61,7 @@ export default class App extends Component {
       this.handleConnectionStatusChange(true);
     });
 
+    // Listen for socket error event
     this.client.on('error', (error) => {
       if (error.message.includes("Connection refused")) {
         console.log("Connection refused");
@@ -68,6 +69,7 @@ export default class App extends Component {
       }
     });
    
+    // Preload the voice annunciation files for faster playback
     this.preloadVoiceFiles();
   }
 
@@ -216,26 +218,19 @@ export default class App extends Component {
         ToneGenerator.setIsPlaying(true);
         ToneGenerator.setDelay(Math.round(data*4.16)+50);
       }
+    } else if (event === "reportingStatus") {
+      this.setState({reporting: data ? true : false});
     }
-  }
-
-  onTone = () => {
-    let delay = 500;
-    ToneGenerator.setShouldQuit(false);
-    ToneGenerator.playSound(500, 80);
-    setInterval(() => {
-      delay -= 25;
-      ToneGenerator.setDelay((delay < 50) ? 50 : delay);
-    }, 500);
   }
 
   startLandingSimulation = () => {
     if (this.simulationInterval) {
+      ToneGenerator.setIsPlaying(false);
       clearInterval(this.simulationInterval);
       this.simulationInterval = null;
     } else {
       ToneGenerator.setShouldQuit(false);
-      ToneGenerator.playSound(500, 80);
+      ToneGenerator.startToneLoop();
       this.simulationInterval = setInterval(() => {
         this.setState({altitude: this.state.altitude-1});
         if (this.state.altitude < 0) {
@@ -279,13 +274,6 @@ export default class App extends Component {
           title="Calibrate Sensor Module"
           color="gray"
           accessibilityLabel="Calibrate Sensor Module"
-        />
-        <View style={{marginBottom: 50}}/>
-        <Button
-          onPress={this.onTone}
-          title="Test tone generator"
-          color="gray"
-          accessibilityLabel="tone"
         />
         <View style={{marginBottom: 50}}/>
         <Button

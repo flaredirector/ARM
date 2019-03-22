@@ -22,20 +22,54 @@ public class ToneGenerator extends ReactContextBaseJavaModule {
 	public boolean shouldQuit = false;
 
 	@ReactMethod
-	public void playSound(final int freqHz, final int durationMs)
+	public void startToneLoop()
 	{
 		Thread playerThread = new Thread() {
 			public void run() {
-				int count = (int)(44100.0 * 2.0 * (durationMs / 1000.0)) & ~1;
-				short[] samples = new short[count];
-				for(int i = 0; i < count; i += 2){
-				short sample = (short)(Math.sin(2 * Math.PI * i / (44100.0 / freqHz)) * 0x7FFF);
-				samples[i + 0] = sample;
-				samples[i + 1] = sample;
+				double duration = 80;            // milliseconds
+				double freqOfTone = 500;       // hz
+				int sampleRate = 8000;          // a number
+
+				double dnumSamples = (duration/1000) * sampleRate;
+				dnumSamples = Math.ceil(dnumSamples);
+				int numSamples = (int) dnumSamples;
+				double sample[] = new double[numSamples];
+				byte generatedSnd[] = new byte[2 * numSamples];
+
+				for (int i = 0; i < numSamples; ++i) {
+					sample[i] = Math.sin(freqOfTone * 2 * Math.PI * i / (sampleRate));
 				}
-				AudioTrack track = new AudioTrack(AudioManager.STREAM_MUSIC, 44100,
-					AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT,
-					count * (Short.SIZE / 8), AudioTrack.MODE_STREAM);
+
+				int idx = 0;
+				int i = 0 ;
+
+				int ramp = numSamples / 20 ;
+
+				for (i = 0; i< ramp; ++i) {
+					double dVal = sample[i];
+					final short val = (short) ((dVal * 32767 * i/ramp));
+					generatedSnd[idx++] = (byte) (val & 0x00ff);
+					generatedSnd[idx++] = (byte) ((val & 0xff00) >>> 8);
+				}
+
+				for (i = i; i< numSamples - ramp; ++i) {
+					double dVal = sample[i];
+					final short val = (short) ((dVal * 32767));
+					generatedSnd[idx++] = (byte) (val & 0x00ff);
+					generatedSnd[idx++] = (byte) ((val & 0xff00) >>> 8);
+				}
+
+				for (i = i; i< numSamples; ++i) {
+					double dVal = sample[i];
+					final short val = (short) ((dVal * 32767 * (numSamples-i)/ramp ));
+					generatedSnd[idx++] = (byte) (val & 0x00ff);
+					generatedSnd[idx++] = (byte) ((val & 0xff00) >>> 8);
+				}
+
+				AudioTrack track = new AudioTrack(AudioManager.STREAM_MUSIC,
+				sampleRate, AudioFormat.CHANNEL_CONFIGURATION_MONO,
+				AudioFormat.ENCODING_PCM_16BIT, (int)numSamples*2,
+				AudioTrack.MODE_STREAM);
 				while (!shouldQuit) {
 					try {
 						sleep(delay);
@@ -43,7 +77,7 @@ public class ToneGenerator extends ReactContextBaseJavaModule {
 						Log.d("INTERRUPTED EXCEPTION", "INTERRUPTED EXCEPTION");
 					}
 					if (isPlaying) {
-						track.write(samples, 0, count);
+						track.write(generatedSnd, 0, generatedSnd.length);
 						track.play();
 					}
 				}
