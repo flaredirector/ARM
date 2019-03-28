@@ -8,7 +8,7 @@
  */
 
 import React, {Component} from 'react';
-import {StyleSheet, Text, View, Button} from 'react-native';
+import {StyleSheet, Text, View, Button, Alert} from 'react-native';
 import SegmentedControlTab from 'react-native-segmented-control-tab';
 import ToggleSwitch from 'toggle-switch-react-native'
 import * as net from'react-native-tcp';
@@ -237,6 +237,24 @@ export default class App extends Component {
       }
     } else if (event === "reportingStatus") {
       this.setState({reporting: Number(data) ? true : false});
+      ToneGenerator.setIsPlaying(this.state.reporting);
+    } else if (event === "calibrationStatus") {
+      let title = "Calibration Error", message = "Calibration Successful";
+      if (data == -1) {
+        message = "The maximum allowable offset has been exceded.";
+      } else if (data == -2) {
+        message = "The sensors have failed or are not responding.";
+      } else {
+        title = "Calibration Successful";
+      }
+      Alert.alert(
+        title,
+        message,
+        [
+          {text: 'OK', onPress: () => console.log('OK Pressed')},
+        ],
+        {cancelable: false},
+      );
     }
   }
 
