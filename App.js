@@ -56,6 +56,7 @@ export default class App extends Component {
     // Create new socket conneciton with provided configuration
     this.client = net.createConnection(this.socketConfig, ()=> {
       console.log("Client connected");
+      this.client.write("getStatus:0\0");
       // Setup event handlers and change connection status
       this.setupClientEventHandlers();
       this.handleConnectionStatusChange(true);
@@ -71,6 +72,9 @@ export default class App extends Component {
    
     // Preload the voice annunciation files for faster playback
     this.preloadVoiceFiles();
+
+    ToneGenerator.setShouldQuit(false);
+    ToneGenerator.startToneLoop();
   }
 
   // Preloads the voice files to reduce latency when playing
@@ -173,33 +177,46 @@ export default class App extends Component {
 
   // TODO
   onStartReporting = (isOn) => {
-    this.setState({reporting: isOn});
-    this.client.write(`reportingToggle:${isOn ? "1" : "0"}`);
+    this.client.write(`reportingToggle:${isOn ? "1" : "0"}\0`);
   }
 
   // Sends the "calibrate" event to the Sensor Module
   onCalibrate = () => {
-    this.client.write("calibrate:1");
+    this.client.write("calibrate:1\0");
+  }
+
+  toFeet = (cm) => {
+    return Math.round(cm / 30.48); 
+  }
+
+  toCm = (feet) => {
+    return Math.round(feet * 30.48);
   }
 
   // Handles incoming event from the ASM
   handleEvent = (event, data) => {
     if (event === "altitude") {
+      if (data > this.toCm(115)) {
+        Object.keys(this.voiceAnnunciationsReported).forEach((key) => {
+          this.voiceAnnunciationsReported[key] = false;
+        });
+      }
+
       // Voice annunciations selected
       if (this.state.selectedIndex == 0) {
         ToneGenerator.setIsPlaying(false);
         let alt = null;
-        if (data < 105 && data > 95)
+        if (data < this.toCm(105) && data > this.toCm(95))
           alt = 100; 
-        else if (data < 55 && data > 45)
+        else if (data < this.toCm(55) && data > this.toCm(45))
           alt = 50;
-        else if (data < 45 && data > 35)
+        else if (data < this.toCm(45) && data > this.toCm(35))
           alt = 40;
-        else if (data < 35 && data > 25)
+        else if (data < this.toCm(35) && data > this.toCm(25))
           alt = 30;
-        else if (data < 25 && data > 15)
+        else if (data < this.toCm(25) && data > this.toCm(15))
           alt = 20;
-        else if (data < 15 && data > 5)
+        else if (data < this.toCm(15) && data > this.toCm(5))
           alt = 10;
         if (alt) {
           if (!this.voiceAnnunciationsReported[`annunciation${alt}`]) {
@@ -216,10 +233,10 @@ export default class App extends Component {
       // Beeps annunciation selected
       } else if (this.state.selectedIndex == 2) {
         ToneGenerator.setIsPlaying(true);
-        ToneGenerator.setDelay(Math.round(data*4.16)+50);
+        ToneGenerator.setDelay(Math.round(this.toFeet(data)*4.16)+50);
       }
     } else if (event === "reportingStatus") {
-      this.setState({reporting: data ? true : false});
+      this.setState({reporting: Number(data) ? true : false});
     }
   }
 
@@ -248,9 +265,9 @@ export default class App extends Component {
   render() {
     return (
       <View style={styles.container}>
-        <Text style={styles.altitude}>Altitude: {this.state.altitude}cm</Text>
-        <Text style={styles.welcome}>LIDAR: {this.state.lidarData}cm</Text>
-        <Text style={styles.welcome}>SONAR: {this.state.sonarData}cm</Text>
+        <Text style={styles.altitude}>Altitude: {this.state.altitude} cm, {this.toFeet(this.state.altitude)} feet</Text>
+        <Text style={styles.welcome}>LIDAR: {this.state.lidarData} cm, {this.toFeet(this.state.lidarData)} feet</Text>
+        <Text style={styles.welcome}>SONAR: {this.state.sonarData} cm, {this.toFeet(this.state.sonarData)} feet</Text>
         <Text style={styles.welcome}>Status: <Text style={{color: this.state.connected ? 'green' : 'red'}}>{this.state.connected ? "Connected" : "Disconnected"}</Text></Text>
         <Text style={styles.welcome}>Reporting Mode</Text>
         <SegmentedControlTab
