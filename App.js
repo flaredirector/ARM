@@ -8,7 +8,7 @@
  */
 
 import React, {Component} from 'react';
-import {StyleSheet, Text, View, Button, Alert} from 'react-native';
+import {StyleSheet, Text, View, Button, Alert, ProgressBarAndroid} from 'react-native';
 import SegmentedControlTab from 'react-native-segmented-control-tab';
 import ToggleSwitch from 'toggle-switch-react-native'
 import * as net from'react-native-tcp';
@@ -50,7 +50,11 @@ export default class App extends Component {
       lidarData: 0,
       sonarData: 0,
       connected: false,
-      isTonePlaying: false
+      isTonePlaying: false,
+      battery: 0,
+      calibrating: false,
+      hasBeenCalibrated: false,
+      dataLogging: false
     }
 
     // Create new socket conneciton with provided configuration
@@ -175,20 +179,28 @@ export default class App extends Component {
     });
   }
 
-  // TODO
-  onStartReporting = (isOn) => {
-    this.client.write(`reportingToggle:${isOn ? "1" : "0"}\0`);
+  // Toggle reporting
+  onStartReporting = () => {
+    this.client.write(`reportingToggle:${!this.state.reporting ? "1" : "0"}\0`);
   }
 
   // Sends the "calibrate" event to the Sensor Module
   onCalibrate = () => {
+    this.setState({calibrating: true});
     this.client.write("calibrate:1\0");
   }
 
+  // Toggle data logging
+  toggleDataLogging = () => {
+    this.client.write(`loggingToggle:${this.state.dataLogging ? "0" : "1"}\0`);
+  }
+
+  // Conversion from cm to feet
   toFeet = (cm) => {
     return Math.round(cm / 30.48); 
   }
 
+  // Conversion from feet to cm
   toCm = (feet) => {
     return Math.round(feet * 30.48);
   }
@@ -230,22 +242,32 @@ export default class App extends Component {
             this.voiceAnnunciationsReported[`annunciation${alt}`] = true;
           }
         }
-      // Beeps annunciation selected
-      } else if (this.state.selectedIndex == 2) {
+      } else if (this.state.selectedIndex == 1) {
         ToneGenerator.setIsPlaying(true);
         ToneGenerator.setDelay(Math.round(this.toFeet(data)*4.16)+50);
       }
+
     } else if (event === "reportingStatus") {
-      this.setState({reporting: Number(data) ? true : false});
+      this.setState({reporting: (Number(data) == 1) ? true : false});
       ToneGenerator.setIsPlaying(this.state.reporting);
+
     } else if (event === "calibrationStatus") {
+      this.setState({calibrating: false});
+      if (data == 1) {
+        this.setState({hasBeenCalibrated: false});
+        return;
+      } else if (data == 0) {
+        this.setState({hasBeenCalibrated: true})
+        return;
+      }
+      this.setState({calibrating: false});
       let title = "Calibration Error", message = "Calibration Successful";
       if (data == -1) {
         message = "The maximum allowable offset has been exceded.";
+        this.setState({hasBeenCalibrated: false})
       } else if (data == -2) {
         message = "The sensors have failed or are not responding.";
-      } else {
-        title = "Calibration Successful";
+        this.setState({hasBeenCalibrated: false})
       }
       Alert.alert(
         title,
@@ -255,6 +277,12 @@ export default class App extends Component {
         ],
         {cancelable: false},
       );
+
+    } else if (event === "batteryStatus") {
+      this.setState({battery: data});
+
+    } else if (event === "loggingStatus") {
+      this.setState({dataLogging: (Number(data) == 1) ? true : false})
     }
   }
 
@@ -279,6 +307,23 @@ export default class App extends Component {
     }  
   }
 
+  renderCalibrateButton = () => {
+    if (this.state.calibrating) {
+      return (<>
+      <ProgressBarAndroid
+        styleAttr="Normal"
+      />
+      </>)
+    } else {
+      return (<Button
+        onPress={this.onCalibrate}
+        title="Calibrate Sensor Module"
+        color="gray"
+        accessibilityLabel="Calibrate Sensor Module"
+      />)
+    }
+  }
+
   // The UI rendered on screen
   render() {
     return (
@@ -290,32 +335,42 @@ export default class App extends Component {
         <Text style={styles.welcome}>Reporting Mode</Text>
         <SegmentedControlTab
           tabsContainerStyle={{marginLeft: 150, marginRight: 150}}
-          values={['Voice', 'Tone', 'Beeps']}
+          values={['Voice', 'Beeps']}
           selectedIndex={this.state.selectedIndex}
           onTabPress={this.handleIndexChange}
         />
-        <View style={{marginBottom: 50}}/>
-        <Text style={styles.welcome}>Reporting Off/On</Text>
-        <ToggleSwitch
-          isOn={this.state.reporting}
-          onColor='green'
-          offColor='red'
-          size='large'
-          onToggle={this.onStartReporting}
-        />
-        <View style={{marginBottom: 50}}/>
+        <View style={{marginBottom: 30}}/>
         <Button
-          onPress={this.onCalibrate}
-          title="Calibrate Sensor Module"
-          color="gray"
-          accessibilityLabel="Calibrate Sensor Module"
+          onPress={this.onStartReporting}
+          title={`Turn ${this.state.reporting ? "OFF" : "ON"} Reporting`}
+          color={this.state.reporting ? "red" : "green"}
+          accessibilityLabel="Reporting toggle."
         />
-        <View style={{marginBottom: 50}}/>
+        <Text style={styles.welcome}>Battery: {this.state.battery}%</Text>
+        <ProgressBarAndroid
+          styleAttr="Horizontal"
+          indeterminate={false}
+          progress={this.state.battery / 100}
+          style={{width: 200}}
+        />
+        <View style={{marginBottom: 30}}/>
+        {(this.state.calibrating ?
+          <ProgressBarAndroid styleAttr="Normal"/>
+          :
+          <>
+          <Button
+            onPress={this.onCalibrate}
+            title="Calibrate Sensor Module"
+            color="gray"
+            accessibilityLabel="Calibrate Sensor Module"
+          />
+          <Text style={{...styles.welcome, color: this.state.hasBeenCalibrated ? "green" : "red"}}>{this.state.hasBeenCalibrated ? "Calibrated" : "Not Calibrated"}</Text>
+        </>)}
         <Button
-          onPress={this.startLandingSimulation}
-          title="Simulate landing"
-          color="gray"
-          accessibilityLabel="simulation"
+          onPress={this.toggleDataLogging}
+          title={`Turn ${this.state.dataLogging ? "OFF" : "ON"} Data Logging`}
+          color={this.state.dataLogging ? "red" : "green"}
+          accessibilityLabel="Toggle data logging"
         />
     </View>
     );
@@ -331,7 +386,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5FCFF',
   },
   welcome: {
-    fontSize: 20,
+    fontSize: 25,
     textAlign: 'center',
     margin: 20,
   },
