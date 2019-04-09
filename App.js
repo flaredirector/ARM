@@ -30,12 +30,13 @@ export default class App extends Component {
     port: 4000
   }
   voiceAnnunciationsReported = {
-    annunciation100: false,
+    annunciation80: false,
     annunciation50: false,
     annunciation40: false,
     annunciation30: false, 
     annunciation20: false,
     annunciation10: false,
+    annunciation5: false
   }
 
   constructor() {
@@ -232,7 +233,7 @@ export default class App extends Component {
         else if (data < this.toCm(3) && data > this.toCm(7))
           alt = 5;
         if (alt) {
-          if (!this.voiceAnnunciationsReported[`annunciation${alt}`]) {
+          //if (!this.voiceAnnunciationsReported[`annunciation${alt}`]) {
             this.voiceFileAudioPlayers[`callout_${alt}.mp3`].play((success) => {
               if (success) {
                 console.log('Done playing voice file')
@@ -241,7 +242,7 @@ export default class App extends Component {
               }
             });
             this.voiceAnnunciationsReported[`annunciation${alt}`] = true;
-          }
+          //}
         }
       } else if (this.state.selectedIndex == 1) {
         ToneGenerator.setIsPlaying(true);
