@@ -1,10 +1,10 @@
 {
     "voiceFiles" : [
-        "voice_10ft.mp3",
-        "voice_20ft.mp3",
-        "voice_30ft.mp3",
-        "voice_40ft.mp3",
-        "voice_50ft.mp3",
-        "voice_100ft.mp3"
+        "callout_10.mp3",
+        "callout_20.mp3",
+        "callout_30.mp3",
+        "callout_40.mp3",
+        "callout_50.mp3",
+        "callout_80.mp3"
     ]
 }

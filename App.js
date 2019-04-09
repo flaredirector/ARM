@@ -10,7 +10,6 @@
 import React, {Component} from 'react';
 import {StyleSheet, Text, View, Button, Alert, ProgressBarAndroid} from 'react-native';
 import SegmentedControlTab from 'react-native-segmented-control-tab';
-import ToggleSwitch from 'toggle-switch-react-native'
 import * as net from'react-native-tcp';
 import {NativeModules} from 'react-native';
 import {voiceFiles} from './audio_files';
@@ -51,7 +50,7 @@ export default class App extends Component {
       sonarData: 0,
       connected: false,
       isTonePlaying: false,
-      battery: 0,
+      battery: -1,
       calibrating: false,
       hasBeenCalibrated: false,
       dataLogging: false
@@ -218,8 +217,8 @@ export default class App extends Component {
       if (this.state.selectedIndex == 0) {
         ToneGenerator.setIsPlaying(false);
         let alt = null;
-        if (data < this.toCm(105) && data > this.toCm(95))
-          alt = 100; 
+        if (data < this.toCm(85) && data > this.toCm(75))
+          alt = 80; 
         else if (data < this.toCm(55) && data > this.toCm(45))
           alt = 50;
         else if (data < this.toCm(45) && data > this.toCm(35))
@@ -228,11 +227,13 @@ export default class App extends Component {
           alt = 30;
         else if (data < this.toCm(25) && data > this.toCm(15))
           alt = 20;
-        else if (data < this.toCm(15) && data > this.toCm(5))
+        else if (data < this.toCm(12) && data > this.toCm(8))
           alt = 10;
+        else if (data < this.toCm(3) && data > this.toCm(7))
+          alt = 5;
         if (alt) {
           if (!this.voiceAnnunciationsReported[`annunciation${alt}`]) {
-            this.voiceFileAudioPlayers[`voice_${alt}ft.mp3`].play((success) => {
+            this.voiceFileAudioPlayers[`callout_${alt}.mp3`].play((success) => {
               if (success) {
                 console.log('Done playing voice file')
               } else {
@@ -339,20 +340,29 @@ export default class App extends Component {
           selectedIndex={this.state.selectedIndex}
           onTabPress={this.handleIndexChange}
         />
-        <View style={{marginBottom: 30}}/>
+        <View style={{marginBottom: 50}}/>
         <Button
           onPress={this.onStartReporting}
           title={`Turn ${this.state.reporting ? "OFF" : "ON"} Reporting`}
           color={this.state.reporting ? "red" : "green"}
           accessibilityLabel="Reporting toggle."
         />
-        <Text style={styles.welcome}>Battery: {this.state.battery}%</Text>
-        <ProgressBarAndroid
-          styleAttr="Horizontal"
-          indeterminate={false}
-          progress={this.state.battery / 100}
-          style={{width: 200}}
-        />
+        <View style={{marginBottom: 10}}/>
+        <Text style={styles.welcome}>
+          {(this.state.battery != -1) ? 
+            `Battery: ${this.state.battery} %` : 
+            'Battery Status Unavailable'}
+        </Text>
+        {(this.state.battery != -1) ? 
+          <ProgressBarAndroid
+            styleAttr="Horizontal"
+            indeterminate={false}
+            progress={this.state.battery / 100}
+            style={{width: 200}}
+          />
+          : null
+        }
+        
         <View style={{marginBottom: 30}}/>
         {(this.state.calibrating ?
           <ProgressBarAndroid styleAttr="Normal"/>
@@ -366,6 +376,7 @@ export default class App extends Component {
           />
           <Text style={{...styles.welcome, color: this.state.hasBeenCalibrated ? "green" : "red"}}>{this.state.hasBeenCalibrated ? "Calibrated" : "Not Calibrated"}</Text>
         </>)}
+        <View style={{marginBottom: 20}}/>
         <Button
           onPress={this.toggleDataLogging}
           title={`Turn ${this.state.dataLogging ? "OFF" : "ON"} Data Logging`}
