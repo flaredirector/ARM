@@ -54,7 +54,9 @@ export default class App extends Component {
       battery: -1,
       calibrating: false,
       hasBeenCalibrated: false,
-      dataLogging: false
+      dataLogging: false,
+      lidarStatus: 0,
+      sonarStatus: 0
     }
 
     // Create new socket conneciton with provided configuration
@@ -131,6 +133,19 @@ export default class App extends Component {
     // Handle socket close event
     this.client.on('close', () => {
       console.log("Client closed connection");
+      let s = new Sound("disconnected.mp3", Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+          console.log('Failed to load sound file', error);
+          return;
+        }
+
+        s.play((success) => {
+          if (success)
+            console.log("done playing");
+          else
+            console.log("failed to play")
+        })
+      }); 
       this.handleConnectionStatusChange(false);
       this.reconnectInterval = this.startReconnectInterval();
     });
@@ -284,7 +299,44 @@ export default class App extends Component {
       this.setState({battery: data});
 
     } else if (event === "loggingStatus") {
-      this.setState({dataLogging: (Number(data) == 1) ? true : false})
+      this.setState({dataLogging: (Number(data) == 1) ? true : false});
+
+    } else if (event === "lidarStatus") {
+      this.setState({lidarStatus: Number(data)})
+      // Fire error event for lidar
+      if (Number(data) < 0) {
+        let s = new Sound("sensor_failure.mp3", Sound.MAIN_BUNDLE, (error) => {
+          if (error) {
+            console.log('Failed to load sound file', error);
+            return;
+          }
+
+          s.play((success) => {
+            if (success)
+              console.log("done playing");
+            else
+              console.log("failed to play")
+          })
+        });
+      }
+    } else if (event === "sonarStatus") {
+      this.setState({sonarStatus: Number(data)});
+      // Fire error event for sonar
+      if (Number(data) < 0) {
+        let s = new Sound("sensor_failure.mp3", Sound.MAIN_BUNDLE, (error) => {
+          if (error) {
+            console.log('Failed to load sound file', error);
+            return;
+          }
+
+          s.play((success) => {
+            if (success)
+              console.log("done playing");
+            else
+              console.log("failed to play")
+          })
+        });
+      }
     }
   }
 
@@ -331,8 +383,17 @@ export default class App extends Component {
     return (
       <View style={styles.container}>
         <Text style={styles.altitude}>Altitude: {this.state.altitude} cm, {this.toFeet(this.state.altitude)} feet</Text>
-        <Text style={styles.welcome}>LIDAR: {this.state.lidarData} cm, {this.toFeet(this.state.lidarData)} feet</Text>
-        <Text style={styles.welcome}>SONAR: {this.state.sonarData} cm, {this.toFeet(this.state.sonarData)} feet</Text>
+        
+        {(this.state.lidarStatus < 0) ? 
+          <Text style={{...styles.welcome, color: 'red'}}>LIDAR: FAILURE</Text>
+          : <Text style={styles.welcome}>LIDAR: {this.state.lidarData} cm, {this.toFeet(this.state.lidarData)} feet</Text>
+        }
+        
+        {(this.state.sonarStatus < 0) ? 
+          <Text style={{...styles.welcome, color: 'red'}}>SONAR: FAILURE</Text>
+          : <Text style={styles.welcome}>SONAR: {this.state.sonarData} cm, {this.toFeet(this.state.sonarData)} feet</Text>
+        }
+        
         <Text style={styles.welcome}>Status: <Text style={{color: this.state.connected ? 'green' : 'red'}}>{this.state.connected ? "Connected" : "Disconnected"}</Text></Text>
         <Text style={styles.welcome}>Reporting Mode</Text>
         <SegmentedControlTab
