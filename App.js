@@ -233,19 +233,19 @@ export default class App extends Component {
       if (this.state.selectedIndex == 0) {
         ToneGenerator.setIsPlaying(false);
         let alt = null;
-        if (data < this.toCm(85) && data > this.toCm(75))
+        if (data < this.toCm(82) && data > this.toCm(78))
           alt = 80; 
-        else if (data < this.toCm(55) && data > this.toCm(45))
+        else if (data < this.toCm(52) && data > this.toCm(48))
           alt = 50;
-        else if (data < this.toCm(45) && data > this.toCm(35))
+        else if (data < this.toCm(42) && data > this.toCm(38))
           alt = 40;
-        else if (data < this.toCm(35) && data > this.toCm(25))
+        else if (data < this.toCm(32) && data > this.toCm(28))
           alt = 30;
-        else if (data < this.toCm(25) && data > this.toCm(15))
+        else if (data < this.toCm(22) && data > this.toCm(18))
           alt = 20;
-        else if (data < this.toCm(12) && data > this.toCm(8))
+        else if (data < this.toCm(11) && data > this.toCm(9))
           alt = 10;
-        else if (data < this.toCm(3) && data > this.toCm(7))
+        else if (data < this.toCm(4) && data > this.toCm(6))
           alt = 5;
         if (alt) {
           //if (!this.voiceAnnunciationsReported[`annunciation${alt}`]) {
